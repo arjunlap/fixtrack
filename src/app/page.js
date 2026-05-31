@@ -95,10 +95,39 @@ const initialServices = [
     timeline: ["Service masuk", "Diagnosa", "Proses", "QC", "Selesai"],
   },
 ];
-
+const initialParts = [
+  {
+    name: "LCD Samsung A13",
+    category: "LCD",
+    supplier: "Jakarta Part",
+    buyPrice: "Rp 210.000",
+    sellPrice: "Rp 350.000",
+    stock: 2,
+    minStock: 3,
+  },
+  {
+    name: "Baterai iPhone XR",
+    category: "Baterai",
+    supplier: "Apple Part ID",
+    buyPrice: "Rp 185.000",
+    sellPrice: "Rp 320.000",
+    stock: 1,
+    minStock: 2,
+  },
+  {
+    name: "Sub Board Redmi Note 10",
+    category: "Connector",
+    supplier: "Grosir HP",
+    buyPrice: "Rp 85.000",
+    sellPrice: "Rp 160.000",
+    stock: 6,
+    minStock: 2,
+  },
+];
 export default function HomePage() {
   const [activeMenu, setActiveMenu] = useState("Dashboard");
   const [services, setServices] = useState(initialServices);
+  const [parts, setParts] = useState(initialParts);
 
   return (
     <div className="min-h-screen bg-gray-100 flex text-gray-900">
@@ -146,10 +175,12 @@ export default function HomePage() {
         )}
 
         {activeMenu === "Customer" && <CustomerPage services={services} />}
-
+        {activeMenu === "Inventaris" && (<InventoryPage parts={parts} setParts={setParts} />
+        )}
         {activeMenu !== "Dashboard" &&
           activeMenu !== "Service" &&
-          activeMenu !== "Customer" && (
+          activeMenu !== "Customer" && 
+          activeMenu !== "Inventaris" &&          (
             <div className="bg-white rounded-xl p-8 shadow">
               <h3 className="text-2xl font-bold mb-2 text-gray-900">
                 Modul {activeMenu}
@@ -580,7 +611,177 @@ function CustomerPage({ services }) {
     </div>
   );
 }
+function InventoryPage({ parts, setParts }) {
+  const [showForm, setShowForm] = useState(false);
 
+  const lowStockParts = parts.filter((part) => Number(part.stock) <= Number(part.minStock));
+
+  function addPart(newPart) {
+    setParts([newPart, ...parts]);
+    setShowForm(false);
+  }
+
+  return (
+    <div>
+      {showForm && (
+        <PartForm
+          onClose={() => setShowForm(false)}
+          onSave={addPart}
+        />
+      )}
+
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-900">Inventaris Sparepart</h3>
+          <p className="text-gray-600">Kelola stok, harga beli, harga jual, supplier, dan alert stok rendah.</p>
+        </div>
+
+        <button
+          onClick={() => setShowForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+        >
+          + Part Baru
+        </button>
+      </div>
+
+      {lowStockParts.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+          <h4 className="font-bold text-yellow-900 mb-2">Alert Stok Rendah</h4>
+
+          <div className="space-y-1">
+            {lowStockParts.map((part) => (
+              <p key={part.name} className="text-yellow-800">
+                {part.name} tersisa {part.stock}. Minimum stok {part.minStock}.
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 text-gray-600">
+            <tr>
+              <th className="p-4">Nama Part</th>
+              <th>Kategori</th>
+              <th>Supplier</th>
+              <th>Harga Beli</th>
+              <th>Harga Jual</th>
+              <th>Stok</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {parts.map((part) => {
+              const isLow = Number(part.stock) <= Number(part.minStock);
+
+              return (
+                <tr key={part.name} className="border-t">
+                  <td className="p-4 font-bold text-gray-900">{part.name}</td>
+                  <td className="text-gray-700">{part.category}</td>
+                  <td className="text-gray-700">{part.supplier}</td>
+                  <td className="text-gray-700">{part.buyPrice}</td>
+                  <td className="text-gray-700">{part.sellPrice}</td>
+                  <td className="font-bold text-gray-900">{part.stock}</td>
+                  <td>
+                    {isLow ? (
+                      <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg text-sm font-semibold">
+                        Stok Rendah
+                      </span>
+                    ) : (
+                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-lg text-sm font-semibold">
+                        Aman
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function PartForm({ onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: "",
+    category: "",
+    supplier: "",
+    buyPrice: "",
+    sellPrice: "",
+    stock: "",
+    minStock: "",
+  });
+
+  function handleChange(event) {
+    const { name, value } = event.target;
+
+    setForm({
+      ...form,
+      [name]: value,
+    });
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    if (!form.name || !form.category || !form.stock || !form.minStock) {
+      alert("Nama part, kategori, stok, dan minimum stok wajib diisi.");
+      return;
+    }
+
+    onSave(form);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
+        <div className="flex justify-between items-center border-b p-5">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">Part Baru</h3>
+            <p className="text-gray-600">Tambah sparepart ke inventaris.</p>
+          </div>
+
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl">
+            <X size={22} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Nama Part" name="name" value={form.name} onChange={handleChange} />
+            <Input label="Kategori" name="category" value={form.category} onChange={handleChange} />
+            <Input label="Supplier" name="supplier" value={form.supplier} onChange={handleChange} />
+            <Input label="Harga Beli" name="buyPrice" value={form.buyPrice} onChange={handleChange} placeholder="Rp 0" />
+            <Input label="Harga Jual" name="sellPrice" value={form.sellPrice} onChange={handleChange} placeholder="Rp 0" />
+            <Input label="Stok" name="stock" value={form.stock} onChange={handleChange} />
+            <Input label="Minimum Stok" name="minStock" value={form.minStock} onChange={handleChange} />
+          </div>
+
+          <div className="flex justify-end gap-3 border-t pt-5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2 rounded-xl bg-gray-100 text-gray-900"
+            >
+              Batal
+            </button>
+
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-blue-600 text-white"
+            >
+              Simpan Part
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 function TrackingModal({ service, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
