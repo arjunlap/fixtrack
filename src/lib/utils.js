@@ -1,15 +1,3 @@
-export function parseRupiah(value) {
-  return Number(String(value || "0").replace(/[^0-9]/g, "")) || 0;
-}
-
-export function formatRupiah(value) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 export function openWhatsApp(service) {
   const phone = String(service.wa || "").replace(/^0/, "62");
 
@@ -25,6 +13,17 @@ Terima kasih.
 - FixTrack`;
 
   const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-
   window.open(url, "_blank");
+}
+
+export function parseRupiah(value) {
+  return Number(String(value || "0").replace(/[^0-9]/g, "")) || 0;
+}
+
+export function formatRupiah(value) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
