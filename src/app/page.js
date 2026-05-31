@@ -13,7 +13,6 @@ import {
   Clock,
   CheckCircle,
   X,
-  MessageCircle,
 } from "lucide-react";
 
 const menu = [
@@ -54,7 +53,9 @@ const initialServices = [
     complaint: "HP jatuh, layar bergaris hijau",
     diagnosis: "LCD rusak, frame aman",
     status: "ANTRI",
+    technician: "Raka",
     cost: "Rp 450.000",
+    partCost: "Rp 210.000",
     lockPattern: [0, 1, 4, 7, 8],
     timeline: ["Service masuk", "Status ANTRI"],
   },
@@ -72,7 +73,9 @@ const initialServices = [
     complaint: "Baterai cepat habis",
     diagnosis: "Battery health 72%, perlu ganti baterai",
     status: "PROSES",
+    technician: "Dimas",
     cost: "Rp 380.000",
+    partCost: "Rp 185.000",
     lockPattern: [2, 4, 6, 8],
     timeline: ["Service masuk", "Diagnosa", "Masuk proses"],
   },
@@ -90,11 +93,14 @@ const initialServices = [
     complaint: "Kadang masuk charger kadang tidak",
     diagnosis: "Sub board charger perlu diganti",
     status: "SELESAI",
+    technician: "Raka",
     cost: "Rp 220.000",
+    partCost: "Rp 85.000",
     lockPattern: [0, 3, 4, 5, 8],
     timeline: ["Service masuk", "Diagnosa", "Proses", "QC", "Selesai"],
   },
 ];
+
 const initialParts = [
   {
     name: "LCD Samsung A13",
@@ -124,10 +130,33 @@ const initialParts = [
     minStock: 2,
   },
 ];
+
+const initialTechnicians = [
+  {
+    name: "Raka",
+    role: "Teknisi Senior",
+    status: "Aktif",
+    qcRate: 96,
+  },
+  {
+    name: "Dimas",
+    role: "Teknisi",
+    status: "Aktif",
+    qcRate: 92,
+  },
+  {
+    name: "Maya",
+    role: "Admin Frontdesk",
+    status: "Aktif",
+    qcRate: 100,
+  },
+];
+
 export default function HomePage() {
   const [activeMenu, setActiveMenu] = useState("Dashboard");
   const [services, setServices] = useState(initialServices);
   const [parts, setParts] = useState(initialParts);
+  const [technicians, setTechnicians] = useState(initialTechnicians);
 
   return (
     <div className="min-h-screen bg-gray-100 flex text-gray-900">
@@ -169,18 +198,26 @@ export default function HomePage() {
         </p>
 
         {activeMenu === "Dashboard" && <Dashboard services={services} />}
-
         {activeMenu === "Service" && (
           <ServicePage services={services} setServices={setServices} />
         )}
-
         {activeMenu === "Customer" && <CustomerPage services={services} />}
-        {activeMenu === "Inventaris" && (<InventoryPage parts={parts} setParts={setParts} />
+        {activeMenu === "Inventaris" && (
+          <InventoryPage parts={parts} setParts={setParts} />
         )}
+        {activeMenu === "Teknisi" && (
+          <TechnicianPage
+            services={services}
+            technicians={technicians}
+            setTechnicians={setTechnicians}
+          />
+        )}
+
         {activeMenu !== "Dashboard" &&
           activeMenu !== "Service" &&
-          activeMenu !== "Customer" && 
-          activeMenu !== "Inventaris" &&          (
+          activeMenu !== "Customer" &&
+          activeMenu !== "Inventaris" &&
+          activeMenu !== "Teknisi" && (
             <div className="bg-white rounded-xl p-8 shadow">
               <h3 className="text-2xl font-bold mb-2 text-gray-900">
                 Modul {activeMenu}
@@ -198,13 +235,14 @@ export default function HomePage() {
 function Dashboard({ services }) {
   const proses = services.filter((item) => item.status === "PROSES").length;
   const selesai = services.filter((item) => item.status === "SELESAI").length;
+  const omzet = services.reduce((sum, item) => sum + parseRupiah(item.cost), 0);
 
   return (
     <div className="grid md:grid-cols-4 gap-4">
       <StatCard title="Service Hari Ini" value={services.length} icon={<Wrench />} />
       <StatCard title="Dalam Proses" value={proses} icon={<Clock />} />
       <StatCard title="Selesai" value={selesai} icon={<CheckCircle />} />
-      <StatCard title="Omzet Hari Ini" value="Rp 2.350.000" icon={<Wallet />} />
+      <StatCard title="Omzet Hari Ini" value={formatRupiah(omzet)} icon={<Wallet />} />
     </div>
   );
 }
@@ -244,7 +282,9 @@ function ServicePage({ services, setServices }) {
       complaint: newService.complaint,
       diagnosis: newService.diagnosis || "Belum ada diagnosa teknisi",
       status: "ANTRI",
+      technician: newService.technician || "Belum dipilih",
       cost: newService.cost || "Rp 0",
+      partCost: newService.partCost || "Rp 0",
       lockPattern: newService.lockPattern,
       timeline: ["Service masuk", "Status ANTRI"],
     };
@@ -393,7 +433,7 @@ function ServicePage({ services, setServices }) {
               <Info label="Alamat" value={selectedService.address} />
               <Info label="Perangkat" value={selectedService.device} />
               <Info label="IMEI" value={selectedService.imei} />
-              <Info label="Warna" value={selectedService.color} />
+              <Info label="Teknisi" value={selectedService.technician} />
               <Info label="Kerusakan" value={selectedService.issue} />
               <Info label="Biaya" value={selectedService.cost} />
             </div>
@@ -496,10 +536,6 @@ function CustomerPage({ services }) {
   }, [services]);
 
   const [selectedCustomer, setSelectedCustomer] = useState(customers[0]);
-
-  if (!selectedCustomer && customers.length > 0) {
-    setSelectedCustomer(customers[0]);
-  }
 
   return (
     <div className="grid grid-cols-3 gap-6">
@@ -611,10 +647,13 @@ function CustomerPage({ services }) {
     </div>
   );
 }
+
 function InventoryPage({ parts, setParts }) {
   const [showForm, setShowForm] = useState(false);
 
-  const lowStockParts = parts.filter((part) => Number(part.stock) <= Number(part.minStock));
+  const lowStockParts = parts.filter(
+    (part) => Number(part.stock) <= Number(part.minStock)
+  );
 
   function addPart(newPart) {
     setParts([newPart, ...parts]);
@@ -624,16 +663,17 @@ function InventoryPage({ parts, setParts }) {
   return (
     <div>
       {showForm && (
-        <PartForm
-          onClose={() => setShowForm(false)}
-          onSave={addPart}
-        />
+        <PartForm onClose={() => setShowForm(false)} onSave={addPart} />
       )}
 
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-2xl font-bold text-gray-900">Inventaris Sparepart</h3>
-          <p className="text-gray-600">Kelola stok, harga beli, harga jual, supplier, dan alert stok rendah.</p>
+          <h3 className="text-2xl font-bold text-gray-900">
+            Inventaris Sparepart
+          </h3>
+          <p className="text-gray-600">
+            Kelola stok, harga beli, harga jual, supplier, dan alert stok rendah.
+          </p>
         </div>
 
         <button
@@ -705,83 +745,187 @@ function InventoryPage({ parts, setParts }) {
   );
 }
 
-function PartForm({ onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: "",
-    category: "",
-    supplier: "",
-    buyPrice: "",
-    sellPrice: "",
-    stock: "",
-    minStock: "",
-  });
+function TechnicianPage({ services, technicians, setTechnicians }) {
+  const [showForm, setShowForm] = useState(false);
+  const [selectedTechnician, setSelectedTechnician] = useState(technicians[0]);
 
-  function handleChange(event) {
-    const { name, value } = event.target;
+  function addTechnician(newTechnician) {
+    const technicianData = {
+      ...newTechnician,
+      qcRate: Number(newTechnician.qcRate || 100),
+    };
 
-    setForm({
-      ...form,
-      [name]: value,
-    });
+    setTechnicians([technicianData, ...technicians]);
+    setSelectedTechnician(technicianData);
+    setShowForm(false);
   }
 
-  function handleSubmit(event) {
-    event.preventDefault();
+  function getStats(name) {
+    const techServices = services.filter((service) => service.technician === name);
+    const completed = techServices.filter(
+      (service) => service.status === "SELESAI" || service.status === "DIAMBIL"
+    );
 
-    if (!form.name || !form.category || !form.stock || !form.minStock) {
-      alert("Nama part, kategori, stok, dan minimum stok wajib diisi.");
-      return;
-    }
+    const revenue = techServices.reduce(
+      (sum, service) => sum + parseRupiah(service.cost),
+      0
+    );
 
-    onSave(form);
+    const partCost = techServices.reduce(
+      (sum, service) => sum + parseRupiah(service.partCost),
+      0
+    );
+
+    return {
+      totalService: techServices.length,
+      completedService: completed.length,
+      revenue,
+      profit: revenue - partCost,
+    };
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
-        <div className="flex justify-between items-center border-b p-5">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900">Part Baru</h3>
-            <p className="text-gray-600">Tambah sparepart ke inventaris.</p>
-          </div>
+    <div>
+      {showForm && (
+        <TechnicianForm
+          onClose={() => setShowForm(false)}
+          onSave={addTechnician}
+        />
+      )}
 
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl">
-            <X size={22} />
-          </button>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-900">Manajemen Teknisi</h3>
+          <p className="text-gray-600">
+            Pantau teknisi aktif, service selesai, omzet, profit, dan QC rate.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Nama Part" name="name" value={form.name} onChange={handleChange} />
-            <Input label="Kategori" name="category" value={form.category} onChange={handleChange} />
-            <Input label="Supplier" name="supplier" value={form.supplier} onChange={handleChange} />
-            <Input label="Harga Beli" name="buyPrice" value={form.buyPrice} onChange={handleChange} placeholder="Rp 0" />
-            <Input label="Harga Jual" name="sellPrice" value={form.sellPrice} onChange={handleChange} placeholder="Rp 0" />
-            <Input label="Stok" name="stock" value={form.stock} onChange={handleChange} />
-            <Input label="Minimum Stok" name="minStock" value={form.minStock} onChange={handleChange} />
-          </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+        >
+          + Teknisi Baru
+        </button>
+      </div>
 
-          <div className="flex justify-end gap-3 border-t pt-5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-gray-100 text-gray-900"
-            >
-              Batal
-            </button>
+      <div className="grid grid-cols-3 gap-6">
+        <div className="col-span-1 space-y-4">
+          {technicians.map((technician) => {
+            const stats = getStats(technician.name);
+            const active = selectedTechnician?.name === technician.name;
 
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-blue-600 text-white"
-            >
-              Simpan Part
-            </button>
+            return (
+              <button
+                key={technician.name}
+                onClick={() => setSelectedTechnician(technician)}
+                className={`w-full text-left rounded-xl shadow p-5 ${
+                  active ? "bg-gray-900 text-white" : "bg-white hover:bg-gray-50"
+                }`}
+              >
+                <h4 className={`font-bold text-lg ${active ? "text-white" : "text-gray-900"}`}>
+                  {technician.name}
+                </h4>
+                <p className={active ? "text-gray-200" : "text-gray-700"}>
+                  {technician.role}
+                </p>
+                <p className={active ? "text-gray-300 text-sm" : "text-gray-600 text-sm"}>
+                  {stats.totalService} service ditangani
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedTechnician && (
+          <div className="col-span-2 bg-white rounded-xl shadow p-6">
+            <div className="flex justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {selectedTechnician.name}
+                </h3>
+                <p className="text-gray-600">{selectedTechnician.role}</p>
+              </div>
+
+              <span className="bg-green-100 text-green-800 h-fit px-4 py-2 rounded-xl font-semibold">
+                {selectedTechnician.status}
+              </span>
+            </div>
+
+            {(() => {
+              const stats = getStats(selectedTechnician.name);
+
+              return (
+                <>
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                    <Info label="Total Service" value={stats.totalService} />
+                    <Info label="Service Selesai" value={stats.completedService} />
+                    <Info label="Omzet" value={formatRupiah(stats.revenue)} />
+                    <Info label="Profit" value={formatRupiah(stats.profit)} />
+                    <Info label="QC Rate" value={`${selectedTechnician.qcRate}%`} />
+                    <Info label="Status" value={selectedTechnician.status} />
+                    <Info label="Role" value={selectedTechnician.role} />
+                    <Info
+                      label="Rata-rata Profit"
+                      value={
+                        stats.totalService > 0
+                          ? formatRupiah(Math.round(stats.profit / stats.totalService))
+                          : formatRupiah(0)
+                      }
+                    />
+                  </div>
+
+                  <h4 className="text-xl font-bold text-gray-900 mb-4">
+                    Service Ditangani
+                  </h4>
+
+                  <div className="space-y-3">
+                    {services
+                      .filter((service) => service.technician === selectedTechnician.name)
+                      .map((service) => (
+                        <div
+                          key={service.invoice}
+                          className="border rounded-xl p-4 flex justify-between items-center"
+                        >
+                          <div>
+                            <h5 className="font-bold text-gray-900">
+                              {service.invoice}
+                            </h5>
+                            <p className="text-gray-700">{service.device}</p>
+                            <p className="text-sm text-gray-600">
+                              {service.customer}
+                            </p>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="bg-gray-100 text-gray-900 px-3 py-1 rounded-lg text-sm font-semibold">
+                              {service.status}
+                            </span>
+                            <p className="font-bold text-gray-900 mt-2">
+                              {service.cost}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+
+                    {services.filter(
+                      (service) => service.technician === selectedTechnician.name
+                    ).length === 0 && (
+                      <div className="bg-gray-50 rounded-xl p-6 text-gray-600">
+                        Belum ada service untuk teknisi ini.
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
-        </form>
+        )}
       </div>
     </div>
   );
 }
+
 function TrackingModal({ service, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
@@ -1064,7 +1208,9 @@ function ServiceForm({ onClose, onSave }) {
     issue: "",
     complaint: "",
     diagnosis: "",
+    technician: "",
     cost: "",
+    partCost: "",
     lockPattern: [],
   });
 
@@ -1134,7 +1280,9 @@ function ServiceForm({ onClose, onSave }) {
               <Input label="IMEI" name="imei" value={form.imei} onChange={handleChange} />
               <Input label="Warna" name="color" value={form.color} onChange={handleChange} />
               <Input label="Kerusakan" name="issue" value={form.issue} onChange={handleChange} />
+              <Input label="Teknisi" name="technician" value={form.technician} onChange={handleChange} placeholder="Raka / Dimas" />
               <Input label="Estimasi Biaya" name="cost" value={form.cost} onChange={handleChange} placeholder="Rp 0" />
+              <Input label="Modal Part" name="partCost" value={form.partCost} onChange={handleChange} placeholder="Rp 0" />
             </div>
           </div>
 
@@ -1158,19 +1306,148 @@ function ServiceForm({ onClose, onSave }) {
           </div>
 
           <div className="flex justify-end gap-3 border-t pt-5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-gray-100 text-gray-900"
-            >
+            <button type="button" onClick={onClose} className="px-5 py-2 rounded-xl bg-gray-100 text-gray-900">
               Batal
             </button>
 
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-blue-600 text-white"
-            >
+            <button type="submit" className="px-5 py-2 rounded-xl bg-blue-600 text-white">
               Simpan Service
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PartForm({ onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: "",
+    category: "",
+    supplier: "",
+    buyPrice: "",
+    sellPrice: "",
+    stock: "",
+    minStock: "",
+  });
+
+  function handleChange(event) {
+    const { name, value } = event.target;
+
+    setForm({
+      ...form,
+      [name]: value,
+    });
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    if (!form.name || !form.category || !form.stock || !form.minStock) {
+      alert("Nama part, kategori, stok, dan minimum stok wajib diisi.");
+      return;
+    }
+
+    onSave(form);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
+        <div className="flex justify-between items-center border-b p-5">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">Part Baru</h3>
+            <p className="text-gray-600">Tambah sparepart ke inventaris.</p>
+          </div>
+
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl">
+            <X size={22} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Nama Part" name="name" value={form.name} onChange={handleChange} />
+            <Input label="Kategori" name="category" value={form.category} onChange={handleChange} />
+            <Input label="Supplier" name="supplier" value={form.supplier} onChange={handleChange} />
+            <Input label="Harga Beli" name="buyPrice" value={form.buyPrice} onChange={handleChange} placeholder="Rp 0" />
+            <Input label="Harga Jual" name="sellPrice" value={form.sellPrice} onChange={handleChange} placeholder="Rp 0" />
+            <Input label="Stok" name="stock" value={form.stock} onChange={handleChange} />
+            <Input label="Minimum Stok" name="minStock" value={form.minStock} onChange={handleChange} />
+          </div>
+
+          <div className="flex justify-end gap-3 border-t pt-5">
+            <button type="button" onClick={onClose} className="px-5 py-2 rounded-xl bg-gray-100 text-gray-900">
+              Batal
+            </button>
+
+            <button type="submit" className="px-5 py-2 rounded-xl bg-blue-600 text-white">
+              Simpan Part
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function TechnicianForm({ onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: "",
+    role: "",
+    status: "Aktif",
+    qcRate: "100",
+  });
+
+  function handleChange(event) {
+    const { name, value } = event.target;
+
+    setForm({
+      ...form,
+      [name]: value,
+    });
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    if (!form.name || !form.role) {
+      alert("Nama dan role teknisi wajib diisi.");
+      return;
+    }
+
+    onSave(form);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl">
+        <div className="flex justify-between items-center border-b p-5">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">Teknisi Baru</h3>
+            <p className="text-gray-600">Tambah teknisi atau admin operasional.</p>
+          </div>
+
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl">
+            <X size={22} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Nama" name="name" value={form.name} onChange={handleChange} />
+            <Input label="Role" name="role" value={form.role} onChange={handleChange} placeholder="Teknisi / Admin" />
+            <Input label="Status" name="status" value={form.status} onChange={handleChange} />
+            <Input label="QC Rate" name="qcRate" value={form.qcRate} onChange={handleChange} placeholder="100" />
+          </div>
+
+          <div className="flex justify-end gap-3 border-t pt-5">
+            <button type="button" onClick={onClose} className="px-5 py-2 rounded-xl bg-gray-100 text-gray-900">
+              Batal
+            </button>
+
+            <button type="submit" className="px-5 py-2 rounded-xl bg-blue-600 text-white">
+              Simpan Teknisi
             </button>
           </div>
         </form>
