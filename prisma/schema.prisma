@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  wa        String
+  address   String?
+  services  Service[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Technician {
+  id        String    @id @default(cuid())
+  name      String
+  role      String
+  status    String    @default("Aktif")
+  qcRate    Int       @default(100)
+  services  Service[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  invoice     String    @unique
+  status      String    @default("ANTRI")
+
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+
+  technicianId String?
+  technician   Technician? @relation(fields: [technicianId], references: [id])
+
+  brand       String
+  type        String
+  device      String
+  imei        String?
+  color       String?
+  issue       String?
+  complaint   String
+  diagnosis   String?
+
+  cost        Int       @default(0)
+  partCost    Int       @default(0)
+
+  lockPattern Json?
+  timeline    Json?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Part {
+  id        String   @id @default(cuid())
+  name      String
+  category  String
+  supplier  String?
+  buyPrice  Int      @default(0)
+  sellPrice Int      @default(0)
+  stock     Int      @default(0)
+  minStock  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
